@@ -1,0 +1,112 @@
+body {
+  font-family: Georgia, 'Times New Roman', Times, serif, sans-serif;
+  color:#fff;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  background-color: #444;
+}
+
+
+#binky {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  width: 150px;
+  height: auto;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  background-color: transparent; /* No background color */
+  cursor: move; /* Cursor indicates draggable functionality */
+}
+
+#binky .binky-image {
+  width: 100%;
+  border-radius: 50%;
+}
+
+#binky .speech-bubble {
+  margin-top: 10px; /* Positioning the bubble */
+  background-color: #ffeb3b; /* Bubble color */
+  padding: 10px;
+  border-radius: 8px; /* Rounded corners */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Optional: Shadow for the bubble */
+  position: relative; /* Relative positioning for the bubble */
+  z-index: 1001; /* Ensure the bubble is above other elements */
+}
+
+#binky .close-btn {
+  position: absolute; 
+  top: 5px; 
+  right: 5px; 
+  cursor: pointer; 
+  font-size: 14px; 
+  color: black;
+  z-index: 1001;
+}
+
+.card-header {
+  background-color: #000;
+  color: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, .125);
+}
+
+.card {
+  background-color: #000;
+  border: none;
+  border-radius: 1rem;
+}
+
+.card-header {
+  background-color: #ccc;
+  padding: 1rem;
+}
+
+.content-box {
+  background: transparent;
+  padding: 20px;
+}
+
+iframe {
+  width: 100%;
+  height: 500px;
+  border: none;
+}
+
+#title {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 60px;
+}
+
+.tooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background-color: #333;
+  color: #fff;
+  padding: 5px;
+  border-radius: 3px;
+}
+
+#binky {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background-color: #ffeb3b;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgb(0 0 0 / 0.2);
+}
+
+#binky .close-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#binky .speech-bubble {
+  margin-left: 20px;
+}
