@@ -14,12 +14,13 @@
     <div class="card mb-4 box-shadow">
       <div class="card-header">
         <header>
-          <h1 class="text-center my-4" id="title" style="font-size: 60px; background-color: #000;">
+          <h1 class="text-center my-4" id="title" style="font-size: 80px; background-color: #000;">
             <span style="color: red;">B</span>
             <span style="color: orange;">i</span>
             <span style="color: yellow;">n</span>
             <span style="color: green;">k</span>
             <span style="color: blue;">y</span>
+            <span style="color: rgb(255, 0, 34);">...</span>
             <span style="color: indigo;">L</span>
             <span style="color: violet;">i</span>
             <span style="color: rgb(251, 249, 249);">v</span>
@@ -29,69 +30,94 @@
       </div>
     </div>
   </div>
+  <div class="container-fluid">
+    <div class="card mb-4 box-shadow">
+      <div class="card-header">
+        <header>
+          <h1>
+            <center>Addresses3.c</center>
+          </h1>
+        </header>
+      </div>
+    </div>
+  </div>
 
   <div class="container-fluid">
     <div class="row">
-        <div class="col-lg-6"> <!-- Left Column -->
-            <div class="card mb-4 box-shadow">
-                <div class="card-header">
-                    <h2 class="text-center">Source Code</h2>
-                </div>
-                <div class="content-box mb-4">
-                    <div class="code-line">// Stores and prints an integer via its address
-                        <div class="tooltip">Comment describing functionality</div>
-                    </div>
-                    <div class="code-line">#include &lt;stdio.h&gt;
-                        <div class="tooltip">Include Standard IO library</div>
-                    </div>
-                    <div class="code-line">int main(void)
-                        <div class="tooltip">Define main function</div>
-                    </div>
-                    <div class="code-line">{
-                        <div class="tooltip">Start of block</div>
-                    </div>
-                    <div class="code-line">    int n = 50;
-                        <div class="tooltip">Declare and initialize an integer</div>
-                    </div>
-                    <div class="code-line">    int *p = &n;
-                        <div class="tooltip">Declare pointer and assign address of n</div>
-                    </div>
-                    <div class="code-line">    printf("%i\\n", *p);
-                        <div class="tooltip">Print the value pointed by p</div>
-                    </div>
-                    <div class="code-line">}
-                        <div class="tooltip">End of block</div>
-                    </div>
-                </div>
+
+      <div class="col-lg-6"> <!-- Left Column -->
+        <div class="card mb-4 box-shadow">
+          <div class="card-header">
+            <h2 class="text-center">Source Code</h2>
+          </div>
+          <div class="content-box mb-4">
+            <div class="code-line">// Stores and prints an integer via its address
+              <div class="tooltip">Comment describing functionality</div>
             </div>
-            <!-- Display Output Container -->
-            <div class="card mb-4 box-shadow">
-                <div class="card-header">
-                    <h2 class="text-center">Display Output</h2>
-                </div>
-                <div class="content-box">
-                    <p class="text-center">50</p>
-                </div>
+            <div class="code-line">#include &lt;stdio.h&gt;
+              <div class="tooltip">Include Standard IO library</div>
             </div>
+            <div class="code-line">int main(void)
+              <div class="tooltip">Define main function</div>
+            </div>
+            <div class="code-line">{
+              <div class="tooltip">Start of block</div>
+            </div>
+            <div class="code-line"> int n = 50;
+              <div class="tooltip">Declare and initialize an integer</div>
+            </div>
+            <div class="code-line"> int *p = &n;
+              <div class="tooltip">Declare pointer and assign address of n</div>
+            </div>
+            <div class="code-line"> printf("%i\\n", *p);
+              <div class="tooltip">Print the value pointed by p</div>
+            </div>
+            <div class="code-line">}
+              <div class="tooltip">End of block</div>
+            </div>
+          </div>
         </div>
-        <div class="col-lg-6"> <!-- Right Column -->
-            <div class="card mb-4 box-shadow">
-                <div class="card-header">
-                    <h2 class="text-center">P5.js Interactive</h2>
-                </div>
-                <div class="content-box mb-4">
-                    <iframe src="https://editor.p5js.org/marnieklein/full/TLS4AcBTT"></iframe>
-                </div>
-            </div>
+        <!-- Display Output Container -->
+        <div class="card mb-4 box-shadow">
+          <div class="card-header">
+            <h2 class="text-center">Display Output</h2>
+          </div>
+          <div class="content-box">
+            <p class="text-center">50</p>
+          </div>
         </div>
+        <!-- Acknowledgements Section -->
+        <div class="card mb-4 box-shadow">
+          <div class="card-header">
+            <h2 class="text-center">Acknowledgements</h2>
+          </div>
+          <div class="content-box">
+            <p class="text-center">Thank you to Nick Parlante of Stanford University for inspiring this site and this
+              project. Thank you to Dr. David Malan for the source code. Thank you to Brian Yu for help understanding and
+              implementing this project. GPT 4o and Claude were used in constructing this site and interactive.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6"> <!-- Right Column -->
+        <div class="card mb-4 box-shadow">
+          <div class="card-header">
+            <h2 class="text-center">Interactive Schematic</h2>
+          </div>
+          <div class="content-box mb-4">
+            <iframe src="https://editor.p5js.org/marnieklein/full/TLS4AcBTT"></iframe>
+          </div>
+        </div>
+      </div>
     </div>
-</div>
+  </div>
 
   <div id="binky">
-    <div class="close-btn" onclick="toggleBinky()">Move me</div>
+    <div class="control-btn" onclick="toggleBinkySize()">Minimize/Maximize</div>
     <img src="static/binky.jpg" alt="Binky" class="binky-image">
-    <div class="speech-bubble" style="color: #000">Welcome to Binky Live! Explore the code and what each line accomplishes.</div>
-</div>
+    <div class="speech-bubble">Welcome to "Binky Live"! Peruse the code to the left, and explore an animation of the
+      code to the right.</div>
+  </div>
 
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
