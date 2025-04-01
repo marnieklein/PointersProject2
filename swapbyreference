@@ -1,0 +1,897 @@
+let controlPanelWidth;
+let gridAreaX;
+let cols;
+let squareSize;
+let binkyImage;
+let binkyX, binkyY;
+let restartButton;
+let gap;
+let swapRows, mainRows; 
+let swapComplete = false;
+
+// Buttons for different code actions
+let intXButton, intYButton, swapXYButton, tmpButton, aEqBButton, bEqTmpButton;
+
+// Dragging state
+let isDragging = false;
+let draggedButton = null;
+let buttonOriginalPos = {};
+let buttonOffset = { x: 0, y: 0 };
+
+// Button usage tracking
+let intXUsed = false;
+let intYUsed = false;
+let tmpUsed = false;
+let aEqBUsed = false;
+let bEqTmpUsed = false;
+
+// Animation state
+let valueAnimations = [];
+let pointerAnimations = []; // Add pointer animations array
+let animationsRunning = false;
+
+// Error state
+let showError = false;
+let errorTimer = 0;
+let errorMessage = "";
+
+// Simulation state
+let swapActivated = false;
+let showSwapArea = false;
+let swapAreaReady = false;
+
+// Variable allocation state
+let xPosition = null;
+let yPosition = null;
+let aPosition = null;
+let bPosition = null;
+let tmpPosition = null;
+
+// Variable values and states
+let xValue = "1";
+let yValue = "2";
+let tmpValue = "1";
+let aHasValue = false;
+let bHasValue = false;
+let tmpHasValue = false;
+
+function preload() {
+  binkyImage = loadImage('static/binky.jpg');
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  frameRate(60);
+  
+  controlPanelWidth = width / 3;
+  gridAreaX = controlPanelWidth;
+  squareSize = 60;
+  gap = squareSize/3; 
+  cols = floor((width - controlPanelWidth) / squareSize);
+  let totalRows = floor(height / squareSize);
+
+  swapRows = floor(totalRows / 2 - 1);
+  mainRows = floor(totalRows / 2) - 1;
+
+  let binkyWidth = min(binkyImage.width, controlPanelWidth * 0.8);
+  let scaleFactor = binkyWidth / binkyImage.width;
+  let binkyHeight = binkyImage.height * scaleFactor;
+  binkyX = controlPanelWidth / 2 - binkyWidth / 2;
+  binkyY = height - 50 - binkyHeight - 10;
+
+  restartButton = createButton('Restart');
+  restartButton.position(10, height - 50);
+  restartButton.mousePressed(restartSimulation);
+
+  createControlPanelButtons();
+  
+  // Create swap button with tooltip
+  swapXYButton = createButton('swap(&x, &y)');
+  swapXYButton.size(120, 40);
+  swapXYButton.position(width/2 - 60, height/2 - 20);
+  swapXYButton.mousePressed(activateSwapFunction);
+  swapXYButton.attribute('title', 'Call swap with the addresses of x and y');
+  swapXYButton.hide();
+}
+
+function draw() {
+  clear();
+  background(255);
+
+  fill(220);
+  stroke(0);
+  rect(0, 0, controlPanelWidth, height);
+
+  image(binkyImage, binkyX, binkyY, binkyImage.width, binkyImage.height);
+
+  fill(0);
+  textSize(16);
+  textAlign(CENTER);
+  if (swapComplete) {
+    text("You completed the swap using pointers!\nThe values of x and y have actually changed in memory.", 
+         controlPanelWidth / 2, height / 7);
+  } else {
+    text("In this example, we'll pass x and y to the \n swap function *by reference* using pointers.\n The values of x and y will be changed directly in memory.", 
+         controlPanelWidth / 2, height / 7);
+  }
+
+  drawGrid();
+  drawHeaders();
+  
+  if (xPosition) {
+    drawAllocatedVariableAsBlock(xPosition, "x = " + xValue, color(255, 100, 100), 4);
+  }
+  
+  if (yPosition) {
+    drawAllocatedVariableAsBlock(yPosition, "y = " + yValue, color(255, 165, 0), 4);
+  }
+  
+  if (showSwapArea) {
+    if (aPosition) {
+      let aLabel = "a";
+      drawAllocatedVariableAsBlock(aPosition, aLabel, color(100, 255, 100), 8);
+    }
+    
+    if (bPosition) {
+      let bLabel = "b";
+      drawAllocatedVariableAsBlock(bPosition, bLabel, color(100, 100, 255), 8);
+    }
+    
+    if (tmpPosition) {
+      let tmpLabel = tmpHasValue ? "tmp = " + tmpValue : "tmp";
+      drawAllocatedVariableAsBlock(tmpPosition, tmpLabel, color(255, 255, 100), 4);
+    }
+    
+    // Draw completed pointer arrows from the pointer animations array
+    // No need to redraw arrows here anymore - they will be handled by the drawAndUpdatePointerAnimations function
+  }
+  
+  // Draw value animations
+  if (valueAnimations.length > 0) {
+    animationsRunning = true;
+    drawAndUpdateAnimations();
+  } else {
+    animationsRunning = false;
+  }
+  
+  // Draw pointer animations
+  if (pointerAnimations.length > 0) {
+    animationsRunning = true;
+    drawAndUpdatePointerAnimations();
+  }
+  
+  updateButtonVisibility();
+  
+  if (isDragging && draggedButton) {
+    draggedButton.position(mouseX - buttonOffset.x, mouseY - buttonOffset.y);
+  }
+  
+  if (showError) {
+    drawErrorMessage();
+    
+    errorTimer++;
+    if (errorTimer > 120) {
+      showError = false;
+      errorTimer = 0;
+    }
+  }
+}
+
+function drawPointerArrow(x1, y1, x2, y2, arrowColor) {
+  push();
+  stroke(arrowColor);
+  strokeWeight(3);
+  fill(arrowColor);
+  
+  // Draw the line
+  line(x1, y1, x2, y2);
+  
+  // Draw the arrow head
+  let angle = atan2(y2 - y1, x2 - x1);
+  let arrowSize = 10;
+  
+  translate(x2, y2);
+  rotate(angle);
+  triangle(-arrowSize, -arrowSize/2, -arrowSize, arrowSize/2, 0, 0);
+  pop();
+}
+
+function drawAndUpdatePointerAnimations() {
+  // First draw all completed arrows
+  for (let i = 0; i < pointerAnimations.length; i++) {
+    let anim = pointerAnimations[i];
+    if (anim.completed) {
+      push();
+      stroke(anim.color);
+      strokeWeight(3);
+      fill(anim.color);
+      
+      // Draw the line
+      line(anim.startX, anim.startY, anim.endX, anim.endY);
+      
+      // Draw the arrow head
+      let angle = atan2(anim.endY - anim.startY, anim.endX - anim.startX);
+      let arrowSize = 10;
+      
+      translate(anim.endX, anim.endY);
+      rotate(angle);
+      triangle(-arrowSize, -arrowSize/2, -arrowSize, arrowSize/2, 0, 0);
+      pop();
+    }
+  }
+  
+  // Then process and draw animations that are still in progress
+  let allComplete = true;
+  
+  for (let i = pointerAnimations.length - 1; i >= 0; i--) {
+    let anim = pointerAnimations[i];
+    
+    // Skip already completed animations
+    if (anim.completed) continue;
+    
+    allComplete = false; // At least one animation still running
+    
+    // Update animation progress
+    anim.progress += anim.speed;
+    
+    // Calculate current end position for the growing line
+    let currentEndX = anim.startX + (anim.endX - anim.startX) * anim.progress;
+    let currentEndY = anim.startY + (anim.endY - anim.startY) * anim.progress;
+    
+    // Draw the line
+    push();
+    stroke(anim.color);
+    strokeWeight(3);
+    line(anim.startX, anim.startY, currentEndX, currentEndY);
+    
+    // Draw arrow head if close to completion
+    if (anim.progress > 0.9) {
+      let alpha = map(anim.progress, 0.9, 1, 0, 255);
+      fill(anim.color[0], anim.color[1], anim.color[2], alpha);
+      
+      let angle = atan2(anim.endY - anim.startY, anim.endX - anim.startX);
+      let arrowSize = 10;
+      
+      translate(currentEndX, currentEndY);
+      rotate(angle);
+      triangle(-arrowSize, -arrowSize/2, -arrowSize, arrowSize/2, 0, 0);
+    }
+    pop();
+    
+    // Check if animation is complete
+    if (anim.progress >= 1) {
+      if (anim.onComplete) {
+        anim.onComplete();
+      }
+      
+      // Mark as completed instead of removing
+      anim.completed = true;
+    }
+  }
+  
+  // If all animations are complete, we should not keep the animation running
+  if (allComplete && pointerAnimations.length > 0) {
+    // If animations no longer running but we still have completed animations in the array,
+    // we should mark animationsRunning as false
+    let allPointerAnimationsComplete = pointerAnimations.every(anim => anim.completed);
+    if (allPointerAnimationsComplete && valueAnimations.length === 0) {
+      animationsRunning = false;
+    }
+  }
+}
+
+function createControlPanelButtons() {
+  let buttonYStart = height / 7 + 80;
+  let buttonYGap = 30;
+  let buttonXPos = controlPanelWidth / 4;
+
+  intXButton = createButton('int x = 1');
+  intXButton.position(buttonXPos, buttonYStart);
+  intXButton.mousePressed(() => { startDragging(intXButton); });
+  buttonOriginalPos.intXButton = {x: buttonXPos, y: buttonYStart};
+
+  intYButton = createButton('int y = 2');
+  intYButton.position(buttonXPos, buttonYStart + buttonYGap);
+  intYButton.mousePressed(() => { startDragging(intYButton); });
+  buttonOriginalPos.intYButton = {x: buttonXPos, y: buttonYStart + buttonYGap};
+
+  tmpButton = createButton('int tmp = *a');
+  tmpButton.position(buttonXPos, buttonYStart + buttonYGap * 3);
+  tmpButton.mousePressed(() => { startDragging(tmpButton); });
+  tmpButton.hide();
+  buttonOriginalPos.tmpButton = {x: buttonXPos, y: buttonYStart + buttonYGap * 3};
+
+  aEqBButton = createButton('*a = *b');
+  aEqBButton.position(buttonXPos, buttonYStart + buttonYGap * 4);
+  aEqBButton.mousePressed(() => { startDragging(aEqBButton); });
+  aEqBButton.hide();
+  buttonOriginalPos.aEqBButton = {x: buttonXPos, y: buttonYStart + buttonYGap * 4};
+
+  bEqTmpButton = createButton('*b = tmp');
+  bEqTmpButton.position(buttonXPos, buttonYStart + buttonYGap * 5);
+  bEqTmpButton.mousePressed(() => { startDragging(bEqTmpButton); });
+  bEqTmpButton.hide();
+  buttonOriginalPos.bEqTmpButton = {x: buttonXPos, y: buttonYStart + buttonYGap * 5};
+}
+
+function drawAndUpdateAnimations() {
+  for (let i = valueAnimations.length - 1; i >= 0; i--) {
+    let anim = valueAnimations[i];
+    
+    anim.progress += anim.speed;
+    
+    let currentX = anim.startX + (anim.endX - anim.startX) * anim.progress;
+    let currentY = anim.startY + (anim.endY - anim.startY) * anim.progress;
+    
+    fill(anim.color);
+    stroke(0);
+    ellipse(currentX, currentY, squareSize * 0.7, squareSize * 0.7);
+    
+    fill(0);
+    textAlign(CENTER, CENTER);
+    textSize(20);
+    text(anim.value, currentX, currentY);
+    textSize(16);
+    
+    if (anim.progress >= 1) {
+      if (anim.onComplete) {
+        anim.onComplete();
+      }
+      valueAnimations.splice(i, 1);
+    }
+  }
+}
+
+function updateButtonVisibility() {
+  if (xPosition && yPosition && !swapActivated && !animationsRunning) {
+    swapXYButton.show();
+  } else {
+    swapXYButton.hide();
+  }
+  
+  if (showSwapArea && !animationsRunning) {
+    if (!tmpUsed) tmpButton.show(); else tmpButton.hide();
+    if (!aEqBUsed && tmpPosition) aEqBButton.show(); else aEqBButton.hide();
+    if (!bEqTmpUsed && aEqBUsed) bEqTmpButton.show(); else bEqTmpButton.hide();
+  } else {
+    tmpButton.hide();
+    aEqBButton.hide();
+    bEqTmpButton.hide();
+  }
+  
+  if (intXUsed) intXButton.hide();
+  if (intYUsed) intYButton.hide();
+}
+
+function activateSwapFunction() {
+  swapActivated = true;
+  swapAreaReady = true;
+  showSwapArea = true;
+  
+  // Place a and b in separate locations with no overlap
+  aPosition = {
+    x: gridAreaX,
+    y: squareSize
+  };
+  
+  bPosition = {
+    x: gridAreaX + 10 * squareSize, // Moved further to the right (was 5*squareSize)
+    y: squareSize
+  };
+  
+  // Add pointer animation from *a to x (slower)
+  createPointerAnimation(
+    aPosition.x + 4 * squareSize, // Use the end of the a block (8 bytes)
+    aPosition.y + squareSize/2,
+    xPosition.x + 2 * squareSize,
+    xPosition.y + squareSize/2,
+    color(0), // Black color
+    0.01, // Slower animation
+    function() {
+      aHasValue = true;
+      
+      // Add pointer animation from *b to y (slower)
+      createPointerAnimation(
+        bPosition.x + 4 * squareSize, // Use the end of the b block (8 bytes)
+        bPosition.y + squareSize/2,
+        yPosition.x + 2 * squareSize,
+        yPosition.y + squareSize/2,
+        color(0), // Black color
+        0.01, // Slower animation
+        function() {
+          bHasValue = true;
+        }
+      );
+    }
+  );
+}
+
+function createPointerAnimation(startX, startY, endX, endY, color, speed, onComplete) {
+  pointerAnimations.push({
+    startX: startX,
+    startY: startY,
+    endX: endX,
+    endY: endY,
+    color: color,
+    progress: 0,
+    speed: speed || 0.01, // Slower default animation
+    onComplete: onComplete,
+    completed: false
+  });
+}
+
+function createValueAnimation(startX, startY, endX, endY, value, color, speed, onComplete) {
+  valueAnimations.push({
+    startX: startX,
+    startY: startY,
+    endX: endX,
+    endY: endY,
+    value: value,
+    color: color,
+    progress: 0,
+    speed: speed || 0.01, // Slower default animation
+    onComplete: onComplete
+  });
+}
+
+function startDragging(button) {
+  if (animationsRunning) return;
+  
+  isDragging = true;
+  draggedButton = button;
+  buttonOffset.x = mouseX - button.x;
+  buttonOffset.y = mouseY - button.y;
+}
+
+function mouseReleased() {
+  if (isDragging && draggedButton) {
+    if (draggedButton === intXButton) {
+      handleIntXDrop();
+    } else if (draggedButton === intYButton) {
+      handleIntYDrop();
+    } else if (draggedButton === tmpButton) {
+      handleTmpDrop();
+    } else if (draggedButton === aEqBButton) {
+      handleAEqBDrop();
+    } else if (draggedButton === bEqTmpButton) {
+      handleBEqTmpDrop();
+    }
+    
+    resetButtonPosition();
+    isDragging = false;
+    draggedButton = null;
+  }
+}
+
+function handleTmpDrop() {
+  if (isInSwapArea(mouseX, mouseY)) {
+    let gridX = floor((mouseX - gridAreaX) / squareSize);
+    let gridY = floor(mouseY / squareSize) - 1;
+    
+    if (gridX + 3 < cols) {
+      let newPosition = {
+        x: gridAreaX + gridX * squareSize,
+        y: (gridY + 1) * squareSize
+      };
+      
+      if (isOverlappingAllocatedMemory(newPosition, 4)) {
+        showError = true;
+        errorTimer = 0;
+        errorMessage = "Error: memory already allocated";
+        return;
+      }
+      
+      tmpPosition = newPosition;
+      tmpHasValue = false;
+      tmpUsed = true;
+      
+      // Animate value from x (via a) to tmp
+      createValueAnimation(
+        xPosition.x + 2 * squareSize,
+        xPosition.y + squareSize / 2, 
+        tmpPosition.x + 2 * squareSize,
+        tmpPosition.y + squareSize / 2,
+        "1",
+        color(200, 255, 200),
+        0.01, // Slower animation
+        function() {
+          tmpHasValue = true;
+          tmpValue = xValue; // Value from x pointed to by a
+        }
+      );
+    }
+  } else {
+    showError = true;
+    errorTimer = 0;
+    errorMessage = "Error: variables must be declared in the correct scope";
+  }
+}
+
+function handleAEqBDrop() {
+  if (isPointOverArea(mouseX, mouseY, xPosition, 4)) {
+    aEqBUsed = true;
+    
+    // Animate value from y (via b) to x
+    createValueAnimation(
+      yPosition.x + 2 * squareSize,
+      yPosition.y + squareSize / 2, 
+      xPosition.x + 2 * squareSize,
+      xPosition.y + squareSize / 2,
+      "2",
+      color(100, 100, 255),
+      0.01, // Slower animation
+      function() {
+        // Update x value through pointer
+        xValue = yValue;
+      }
+    );
+  } else {
+    showError = true;
+    errorTimer = 0;
+    errorMessage = "Error: assignment must modify the variable pointed to by 'a' (x)";
+  }
+}
+
+function handleBEqTmpDrop() {
+  if (isPointOverArea(mouseX, mouseY, yPosition, 4)) {
+    bEqTmpUsed = true;
+    
+    // Animate value from tmp to y (via b)
+    createValueAnimation(
+      tmpPosition.x + 2 * squareSize,
+      tmpPosition.y + squareSize / 2, 
+      yPosition.x + 2 * squareSize,
+      yPosition.y + squareSize / 2,
+      "1",
+      color(255, 255, 100),
+      0.01, // Slower animation
+      function() {
+        // Update y value through pointer
+        yValue = tmpValue;
+        swapComplete = true;
+      }
+    );
+  } else {
+    showError = true;
+    errorTimer = 0;
+    errorMessage = "Error: assignment must modify the variable pointed to by 'b' (y)";
+  }
+}
+
+function isPointOverArea(x, y, position, length) {
+  let areaLeft = position.x;
+  let areaRight = position.x + length * squareSize;
+  let areaTop = position.y;
+  let areaBottom = position.y + squareSize;
+  
+  return x >= areaLeft && x <= areaRight && y >= areaTop && y <= areaBottom;
+}
+
+function handleIntXDrop() {
+  if (isInMainArea(mouseX, mouseY)) {
+    let gridX = floor((mouseX - gridAreaX) / squareSize);
+    let gridY = floor((mouseY - (swapRows + 2) * squareSize - gap) / squareSize);
+    
+    if (gridX + 3 < cols) {
+      let newPosition = {
+        x: gridAreaX + gridX * squareSize,
+        y: (gridY + swapRows + 2) * squareSize + gap
+      };
+      
+      if (isOverlappingAllocatedMemory(newPosition, 4)) {
+        showError = true;
+        errorTimer = 0;
+        errorMessage = "Error: memory already allocated";
+        return;
+      }
+      
+      xPosition = newPosition;
+      intXUsed = true;
+    }
+  }
+}
+
+function handleIntYDrop() {
+  if (isInMainArea(mouseX, mouseY)) {
+    let gridX = floor((mouseX - gridAreaX) / squareSize);
+    let gridY = floor((mouseY - (swapRows + 2) * squareSize - gap) / squareSize);
+    
+    if (gridX + 3 < cols) {
+      let newPosition = {
+        x: gridAreaX + gridX * squareSize,
+        y: (gridY + swapRows + 2) * squareSize + gap
+      };
+      
+      if (isOverlappingAllocatedMemory(newPosition, 4)) {
+        showError = true;
+        errorTimer = 0;
+        errorMessage = "Error: memory already allocated";
+        return;
+      }
+      
+      yPosition = newPosition;
+      intYUsed = true;
+    }
+  }
+}
+
+function isInSwapArea(x, y) {
+  return x > gridAreaX && x < width && 
+         y > squareSize && y < (swapRows + 1) * squareSize;
+}
+
+function isInMainArea(x, y) {
+  return x > gridAreaX && x < width && 
+         y > (swapRows + 2) * squareSize + gap && 
+         y < (swapRows + mainRows + 2) * squareSize + gap;
+}
+
+function isOverlappingAllocatedMemory(position, length) {
+  for (let i = 0; i < length; i++) {
+    let testX = position.x + i * squareSize;
+    let testY = position.y;
+    
+    if (isPositionInAllocatedArea(testX, testY)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function drawAllocatedVariableAsBlock(position, label, color, length) {
+  fill(color);
+  stroke(0);
+  rect(position.x, position.y, squareSize * length, squareSize);
+  
+  fill(0);
+  textAlign(CENTER, CENTER);
+  textSize(18);
+  text(label, position.x + (squareSize * length) / 2, position.y + squareSize / 2);
+  textSize(16);
+}
+
+function drawErrorMessage() {
+  fill(0, 0, 0, 150);
+  noStroke();
+  rect(0, 0, width, height);
+  
+  fill(255);
+  stroke(255, 0, 0);
+  strokeWeight(3);
+  rectMode(CENTER);
+  let boxWidth = 400;
+  let boxHeight = 150;
+  rect(width/2, height/2, boxWidth, boxHeight, 10);
+  rectMode(CORNER);
+  strokeWeight(1);
+  
+  fill(255, 0, 0);
+  textAlign(CENTER, CENTER);
+  textSize(24);
+  text(errorMessage, width/2, height/2 - 20);
+  
+  textSize(16);
+  text("Click anywhere to continue", width/2, height/2 + 30);
+}
+
+function mousePressed() {
+  if (showError) {
+    showError = false;
+    errorTimer = 0;
+  }
+}
+
+function drawHeaders() {
+  fill(0);
+  textSize(20);
+  textAlign(CENTER, BOTTOM);
+  
+  if (showSwapArea) {
+    text("void swap (int *a, int *b)", gridAreaX + (cols * squareSize) / 2, 20);
+  }
+
+  textAlign(CENTER, TOP);
+  text("int main (void)", gridAreaX + (cols * squareSize) / 2, swapRows * squareSize + gap + 60);
+}
+
+function drawGrid() {
+  let counter = 0;
+
+  if (showSwapArea) {
+    for (let y = 0; y < swapRows; y++) {
+      for (let x = 0; x < cols; x++) {
+        let xpos = gridAreaX + x * squareSize;
+        let ypos = (y + 1) * squareSize;
+        
+        if (isPositionInSwapAllocatedArea(xpos, ypos)) {
+          counter++;
+          continue;
+        }
+
+        fill(240);
+        stroke(0);
+        rect(xpos, ypos, squareSize, squareSize);
+
+        fill(0);
+        noStroke();
+        textAlign(CENTER, BOTTOM);
+        let hexLabel = "0x" + counter.toString(16).toUpperCase();
+        text(hexLabel, xpos + squareSize / 2, ypos + squareSize);
+        counter++;
+      }
+    }
+  } else {
+    counter += swapRows * cols;
+  }
+
+  for (let y = 0; y < mainRows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let xpos = gridAreaX + x * squareSize;
+      let ypos = (y + swapRows + 2) * squareSize + gap;
+      
+      if (isPositionInMainAllocatedArea(xpos, ypos)) {
+        counter++;
+        continue;
+      }
+
+      fill(240);
+      stroke(0);
+      rect(xpos, ypos, squareSize, squareSize);
+
+      fill(0);
+      noStroke();
+      textAlign(CENTER, BOTTOM);
+      let hexLabel = "0x" + counter.toString(16).toUpperCase();
+      text(hexLabel, xpos + squareSize / 2, ypos + squareSize);
+      counter++;
+    }
+  }
+}
+
+function isPositionInSwapAllocatedArea(x, y) {
+  if (aPosition) {
+    for (let i = 0; i < 8; i++) { // Changed from 4 to 8 bytes
+      if (x === aPosition.x + i * squareSize && y === aPosition.y) {
+        return true;
+      }
+    }
+  }
+  
+  if (bPosition) {
+    for (let i = 0; i < 8; i++) { // Changed from 4 to 8 bytes
+      if (x === bPosition.x + i * squareSize && y === bPosition.y) {
+        return true;
+      }
+    }
+  }
+  
+  if (tmpPosition) {
+    for (let i = 0; i < 4; i++) {
+      if (x === tmpPosition.x + i * squareSize && y === tmpPosition.y) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+function isPositionInMainAllocatedArea(x, y) {
+  if (xPosition) {
+    for (let i = 0; i < 4; i++) {
+      if (x === xPosition.x + i * squareSize && y === xPosition.y) {
+        return true;
+      }
+    }
+  }
+  
+  if (yPosition) {
+    for (let i = 0; i < 4; i++) {
+      if (x === yPosition.x + i * squareSize && y === yPosition.y) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+function isPositionInAllocatedArea(x, y) {
+  return isPositionInMainAllocatedArea(x, y) || 
+         (showSwapArea && isPositionInSwapAllocatedArea(x, y));
+}
+
+function resetButtonPosition() {
+  if (draggedButton === intXButton) {
+    intXButton.position(buttonOriginalPos.intXButton.x, buttonOriginalPos.intXButton.y);
+  } else if (draggedButton === intYButton) {
+    intYButton.position(buttonOriginalPos.intYButton.x, buttonOriginalPos.intYButton.y);
+  } else if (draggedButton === tmpButton) {
+    tmpButton.position(buttonOriginalPos.tmpButton.x, buttonOriginalPos.tmpButton.y);
+  } else if (draggedButton === aEqBButton) {
+    aEqBButton.position(buttonOriginalPos.aEqBButton.x, buttonOriginalPos.aEqBButton.y);
+  } else if (draggedButton === bEqTmpButton) {
+    bEqTmpButton.position(buttonOriginalPos.bEqTmpButton.x, buttonOriginalPos.bEqTmpButton.y);
+  }
+}
+
+function restartSimulation() {
+  valueAnimations = [];
+  pointerAnimations = [];
+  
+  if (intXButton) intXButton.remove();
+  if (intYButton) intYButton.remove();
+  if (swapXYButton) swapXYButton.remove();
+  if (tmpButton) tmpButton.remove();
+  if (aEqBButton) aEqBButton.remove();
+  if (bEqTmpButton) bEqTmpButton.remove();
+  
+  swapActivated = false;
+  showSwapArea = false;
+  swapAreaReady = false;
+  animationsRunning = false;
+  showError = false;
+  errorTimer = 0;
+  xPosition = null;
+  yPosition = null;
+  aPosition = null;
+  bPosition = null;
+  tmpPosition = null;
+  swapComplete = false;
+  
+  xValue = "1";
+  yValue = "2";
+  tmpValue = "1";
+  aHasValue = false;
+  bHasValue = false;
+  tmpHasValue = false;
+  
+  intXUsed = false;
+  intYUsed = false;
+  tmpUsed = false;
+  aEqBUsed = false;
+  bEqTmpUsed = false;
+  
+  createControlPanelButtons();
+  swapXYButton = createButton('swap(&x, &y)');
+  swapXYButton.size(120, 40);
+  swapXYButton.position(width/2 - 60, height/2 - 20);
+  swapXYButton.mousePressed(activateSwapFunction);
+  swapXYButton.attribute('title', 'Call swap with the addresses of x and y');
+  swapXYButton.hide();
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+
+  controlPanelWidth = width / 3;
+  gridAreaX = controlPanelWidth;
+  cols = floor((width - controlPanelWidth) / squareSize);
+  let totalRows = floor(height / squareSize);
+  swapRows = floor(totalRows / 2 - 1);
+  mainRows = floor(totalRows / 2) - 1;
+
+  // Reposition Restart Button
+  restartButton.position(10, height - 50);
+
+  // Reposition buttons and update original positions
+  createControlPanelButtons();
+  
+  // Reposition swapXYButton if it exists
+  if (swapXYButton) {
+    swapXYButton.position(width/2 - 60, height/2 - 20);
+  }
+
+  // Recalculate Binky image position
+  let binkyWidth = min(binkyImage.width, controlPanelWidth * 0.8);
+  let scaleFactor = binkyWidth / binkyImage.width;
+  let binkyHeight = binkyImage.height * scaleFactor;
+  binkyX = controlPanelWidth / 2 - binkyWidth / 2;
+  binkyY = height - 50 - binkyHeight - 10;
+  
+  // Update positions of variables if they exist
+  if (xPosition && yPosition) {
+    // Just maintain their relative positions
+    // You could add more complex repositioning logic if needed
+  }
+}
