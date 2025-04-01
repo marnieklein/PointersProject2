@@ -1,0 +1,742 @@
+let characterImage;
+let restartButton;
+let squareSize, cols, rows;
+let instructionWidth = 400;
+let draggableButtons = [];
+let errorDisplayActive = false;
+let errorMessage = "";
+let buttonLabels = [
+  "int* x",
+  "int* y",
+  "x = malloc(sizeof(int))",
+  "*x = 42",
+  "*y = 13",
+  "y = x",
+];
+let hoverTexts = [
+  "Declare a pointer x that can point to a memory location where an integer can be stored",
+  "Declare a pointer y that can point to a memory location where an integer can be stored",
+  "Allocate memory to store an integer and assign the address of this allocated memory to x",
+  "Store the integer value 42 in the memory location that the x is pointing to.",
+  "Store the integer value 13 in the memory location that the y is pointing to.",
+  "Make the pointer y point to the same memory location that x is pointing to.",
+];
+let currentHoverText = "";
+let dragging = null;
+let intXPosition = null;
+let intYPosition = null;
+let mallocPosition = null;
+let yEqualsXAssigned = false;
+let circlePositionX = null;
+let circlePositionY = null;
+let circleActiveX = false;
+let circleActiveY = false;
+let circleProgressX = 0;
+let circleProgressY = 0;
+let circleReachedDestinationX = false;
+let circleReachedDestinationY = false;
+
+// Arrow animation variables
+let arrowAnimations = [];
+let arrowAnimationSpeed = 0.02;
+
+// Question mark animation variables
+let questionMarkX = null;
+let questionMarkY = null;
+let questionMarkX2 = null;
+let questionMarkY2 = null;
+
+function preload() {
+  characterImage = loadImage('static/binky.jpg');
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  squareSize = 80;
+  cols = floor((width - instructionWidth) / squareSize);
+  rows = floor(height / squareSize);
+
+  restartButton = createButton("Restart");
+  restartButton.position(10, height - 90);
+  restartButton.size(150, 70);
+  restartButton.style("font-size", "20px");
+  restartButton.mousePressed(restartSimulation);
+
+  let yOffset = 200;
+  buttonLabels.forEach((label, index) => {
+    let btn = createButton(label);
+    let initialX = 10;
+    let initialY = yOffset + index * 40;
+    btn.position(initialX, initialY);
+    btn.mousePressed(() => startDragging(index));
+    btn.mouseOver(() => (currentHoverText = hoverTexts[index]));
+    btn.mouseOut(() => (currentHoverText = ""));
+    draggableButtons.push({ btn, initialX, initialY, label, dragging: false });
+  });
+
+  mouseReleased = handleDrop;
+  touchEnded = handleDrop;
+}
+
+function draw() {
+  clear();
+  background(255);
+  strokeWeight(0.5);
+
+  // Draw the grid first
+  let counter = 0;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let xpos = instructionWidth + x * squareSize;
+      let ypos = y * squareSize;
+
+      let isPinkSquare = false;
+      let isOrangeSquare = false;
+      let isGreenSquare = false;
+
+      if (intXPosition !== null) {
+        if (
+          y === intXPosition.y &&
+          x >= intXPosition.x &&
+          x < intXPosition.x + 8
+        ) {
+          isPinkSquare = true;
+        }
+      }
+
+      if (intYPosition !== null) {
+        if (
+          y === intYPosition.y &&
+          x >= intYPosition.x &&
+          x < intYPosition.x + 8
+        ) {
+          isOrangeSquare = true;
+        }
+      }
+
+      if (mallocPosition !== null) {
+        if (
+          y === mallocPosition.y &&
+          x >= mallocPosition.x &&
+          x < mallocPosition.x + 4
+        ) {
+          isGreenSquare = true;
+        }
+      }
+
+      if (isPinkSquare) {
+        fill("pink");
+        strokeWeight(2);
+      } else if (isOrangeSquare) {
+        fill("orange");
+        strokeWeight(2);
+      } else if (isGreenSquare) {
+        fill("lightgreen");
+        strokeWeight(2);
+      } else {
+        fill(240);
+        strokeWeight(0.5);
+      }
+
+      stroke(0);
+      rect(xpos, ypos, squareSize, squareSize);
+
+      if (!isPinkSquare && !isOrangeSquare && !isGreenSquare) {
+        fill(0);
+        noStroke();
+        let hexLabel = "0x" + counter.toString(16).toUpperCase();
+        textAlign(CENTER, CENTER);
+        text(hexLabel, xpos + squareSize / 2, ypos + squareSize / 2);
+      }
+      counter++;
+    }
+  }
+
+  // Now draw the stack/heap divider and labels AFTER the grid
+  // Add a horizontal line to separate stack and heap
+  stroke(0);
+  strokeWeight(3);
+  line(instructionWidth, (rows - 1) * squareSize, width, (rows - 1) * squareSize);
+  
+  // Add a semi-transparent background behind labels to make them more readable
+  fill(255, 255, 255, 180); // White with some transparency
+  noStroke();
+  // Stack label background
+  rectMode(CENTER);
+  rect(instructionWidth + (cols * squareSize) / 2, 15, 80, 30, 5);
+  
+  // Heap label background
+  rect(instructionWidth + (cols * squareSize) / 2, (rows - 1) * squareSize - 15, 80, 30, 5);
+  rectMode(CORNER);
+  
+  // Draw labels on top
+  fill(0);
+  textSize(18);
+  textAlign(CENTER, CENTER);
+  // Label all rows except the last as "Stack"
+  text("Stack", instructionWidth + (cols * squareSize) / 2, 15);
+  // Label the last row as "Heap"
+  text("Heap", instructionWidth + (cols * squareSize) / 2, (rows - 1) * squareSize - 15);
+
+  // Draw instruction panel
+  fill(220);
+  rect(0, 0, instructionWidth, height);
+
+  fill(0);
+  noStroke();
+  textSize(30);
+  textAlign(CENTER, CENTER);
+  text("Binky Lives!", instructionWidth / 2, 60);
+  textSize(20);
+  textAlign(CENTER, CENTER);
+  text("Your goal: allocate and dereference", instructionWidth / 2, 100);
+  text("pointers for x and y!", instructionWidth / 2, 150);
+  textSize(12);
+
+  // Draw Binky image in the instruction panel
+  if (characterImage) {
+    let imgWidth = instructionWidth * 0.8;
+    let imgHeight = imgWidth * characterImage.height / characterImage.width;
+    // Position it between the buttons and restart button
+    let imgY = height - imgHeight - 100;
+    image(characterImage, instructionWidth / 2 - imgWidth / 2, imgY, imgWidth, imgHeight);
+  }
+
+  if (dragging !== null && !errorDisplayActive) {
+    let draggedButton = draggableButtons[dragging];
+    let inputX = touches.length > 0 ? touches[0].x : mouseX;
+    let inputY = touches.length > 0 ? touches[0].y : mouseY;
+    draggedButton.btn.position(
+      inputX - squareSize / 4,
+      inputY - squareSize / 4
+    );
+  }
+
+  if (currentHoverText !== "" && !errorDisplayActive) {
+    fill(255);
+    noStroke();
+    rect(mouseX + 10, mouseY + 10, textWidth(currentHoverText) + 10, 20);
+    fill(0);
+    textAlign(LEFT, TOP);
+    text(currentHoverText, mouseX + 15, mouseY + 15);
+  }
+
+  if (circleActiveX) {
+    if (!circleReachedDestinationX) {
+      let startX = instructionWidth + circlePositionX.x * squareSize;
+      let startY = circlePositionX.y * squareSize;
+      let endX =
+        instructionWidth + mallocPosition.x * squareSize + squareSize * 2;
+      let endY = mallocPosition.y * squareSize + squareSize / 2;
+
+      stroke(0);
+      fill(255);
+      ellipse(
+        lerp(startX, endX, circleProgressX),
+        lerp(startY, endY, circleProgressX),
+        40,
+        40
+      );
+
+      fill(0);
+      noStroke();
+      textAlign(CENTER, CENTER);
+      text(
+        "42",
+        lerp(startX, endX, circleProgressX),
+        lerp(startY, endY, circleProgressX)
+      );
+
+      circleProgressX += 0.01;
+      if (circleProgressX >= 1) {
+        circleReachedDestinationX = true;
+        circleActiveX = false;
+        if (yEqualsXAssigned) {
+          changeButtonLabelToYEqualsXEquals42();
+        } else {
+          changeButtonLabelToXEquals42();
+        }
+      }
+    }
+  }
+
+  if (circleActiveY) {
+    if (!circleReachedDestinationY) {
+      let startX = instructionWidth + circlePositionY.x * squareSize;
+      let startY = circlePositionY.y * squareSize;
+      let endX =
+        instructionWidth + mallocPosition.x * squareSize + squareSize * 2;
+      let endY = mallocPosition.y * squareSize + squareSize / 2;
+
+      stroke(0);
+      fill(255);
+      ellipse(
+        lerp(startX, endX, circleProgressY),
+        lerp(startY, endY, circleProgressY),
+        40,
+        40
+      );
+
+      fill(0);
+      noStroke();
+      textAlign(CENTER, CENTER);
+      text(
+        "13",
+        lerp(startX, endX, circleProgressY),
+        lerp(startY, endY, circleProgressY)
+      );
+
+      circleProgressY += 0.01;
+      if (circleProgressY >= 1) {
+        circleReachedDestinationY = true;
+        circleActiveY = false;
+        changeButtonLabelToYEquals13();
+      }
+    }
+  }
+
+  // Draw animated arrows
+  for (let i = 0; i < arrowAnimations.length; i++) {
+    let anim = arrowAnimations[i];
+    drawAnimatedArrow(anim.start, anim.end, anim.progress);
+    anim.progress += arrowAnimationSpeed;
+    if (anim.progress > 1) {
+      anim.progress = 1;
+    }
+  }
+
+  // Draw question mark arrows for uninitialized pointers
+  if (intXPosition !== null && mallocPosition === null && !questionMarkX) {
+    drawQuestionMarkArrow(intXPosition, true);
+  }
+
+  if (intYPosition !== null && mallocPosition === null && !yEqualsXAssigned && !questionMarkY) {
+    drawQuestionMarkArrow(intYPosition, false);
+  }
+
+  // Draw error overlay if active
+  if (errorDisplayActive) {
+    drawErrorOverlay();
+  }
+}
+
+function drawQuestionMarkArrow(position, isX) {
+  let startX = instructionWidth + position.x * squareSize + squareSize * 4;
+  let startY = position.y * squareSize + squareSize / 2;
+  let endX = startX + 50;
+  let endY = startY;
+
+  stroke(0);
+  strokeWeight(2);
+  line(startX, startY, endX, endY);
+
+  // Draw question mark at the end of the arrow
+  fill(255, 0, 0);
+  noStroke();
+  textSize(24);
+  textAlign(CENTER, CENTER);
+  text("?", endX + 10, endY);
+
+  // Store the question mark position
+  if (isX) {
+    questionMarkX = { x: endX + 10, y: endY };
+  } else {
+    questionMarkY = { x: endX + 10, y: endY };
+  }
+}
+
+function startDragging(index) {
+  if (dragging === null && !errorDisplayActive) {
+    dragging = index;
+    draggableButtons[index].dragging = true;
+  }
+}
+
+function handleDrop() {
+  if (dragging !== null) {
+    let draggedButton = draggableButtons[dragging];
+    let buttonIndex = buttonLabels.indexOf(draggedButton.label);
+
+    let gridX = floor((mouseX - instructionWidth) / squareSize);
+    let gridY = floor(mouseY / squareSize);
+    if (touches.length > 0) {
+      gridX = floor((touches[0].x - instructionWidth) / squareSize);
+      gridY = floor(touches[0].y / squareSize);
+    }
+
+    // Check if the position would intersect with existing allocated memory
+    if (!checkMemoryOverlap(draggedButton.label, gridX, gridY)) {
+      if (draggedButton.label === "int* x") {
+        if (gridX >= 0 && gridX + 7 < cols && gridY >= 0 && gridY < rows - 1) { // Stack only
+          intXPosition = { x: gridX, y: gridY };
+          updateButtonPosition(draggedButton, gridX, gridY);
+          // Reset question mark for x
+          questionMarkX = null;
+        } else {
+          intXPosition = null;
+          resetButtonPosition(draggedButton);
+          if (gridY === rows - 1) {
+            showErrorMessage("Pointers should be declared in the stack, not heap!");
+          } else {
+            showErrorMessage("Not sufficient memory: you need 8 bytes for a pointer!");
+          }
+        }
+      } else if (draggedButton.label === "int* y") {
+        if (gridX >= 0 && gridX + 7 < cols && gridY >= 0 && gridY < rows - 1) { // Stack only
+          intYPosition = { x: gridX, y: gridY };
+          updateButtonPosition(draggedButton, gridX, gridY);
+          // Reset question mark for y
+          questionMarkY = null;
+        } else {
+          intYPosition = null;
+          resetButtonPosition(draggedButton);
+          if (gridY === rows - 1) {
+            showErrorMessage("Pointers should be declared in the stack, not heap!");
+          } else {
+            showErrorMessage("Not sufficient memory: you need 8 bytes for a pointer!");
+          }
+        }
+      } else if (draggedButton.label === "x = malloc(sizeof(int))") {
+        if (gridX >= 0 && gridX + 3 < cols && gridY === rows - 1) { // Heap only
+          mallocPosition = { x: gridX, y: gridY };
+          updateButtonPosition(draggedButton, gridX, gridY);
+          
+          // If x pointer was placed, create arrow animation from x to malloc
+          if (intXPosition !== null) {
+            createNewArrowAnimation(intXPosition, { x: gridX, y: gridY });
+            // Remove question mark for x
+            questionMarkX = null;
+          }
+        } else {
+          mallocPosition = null;
+          resetButtonPosition(draggedButton);
+          if (gridY !== rows - 1) {
+            showErrorMessage("Dynamic memory must be allocated on the heap!");
+          } else {
+            showErrorMessage("Not sufficient memory: you need 4 bytes for an int!");
+          }
+        }
+        if (circleReachedDestinationX) {
+          circleProgressX = 0;
+          circlePositionX = { x: gridX, y: gridY };
+          circleActiveX = true;
+        }
+        if (circleReachedDestinationY) {
+          circleProgressY = 0;
+          circlePositionY = { x: gridX, y: gridY };
+          circleActiveY = true;
+        }
+      } else if (draggedButton.label === "*x = 42") {
+        if (isOnPinkSquare(gridX, gridY)) {
+          if (mallocPosition !== null) {
+            circlePositionX = { x: gridX, y: gridY };
+            circleActiveX = true;
+            draggedButton.btn.hide();
+          } else {
+            resetButtonPosition(draggedButton);
+            showErrorMessage("Cannot dereference pointer x: it doesn't point to allocated memory!");
+          }
+        } else {
+          resetButtonPosition(draggedButton);
+          showErrorMessage("Store 42 in the memory location that the pointer x is pointing to. If pointer x points to nothing, this is NULL.");
+        }
+      } else if (draggedButton.label === "*y = 13") {
+        if (isOnOrangeSquare(gridX, gridY) && yEqualsXAssigned) {
+          circlePositionY = { x: gridX, y: gridY };
+          circleActiveY = true;
+          draggedButton.btn.hide();
+        } else {
+          resetButtonPosition(draggedButton);
+          showErrorMessage("This button should be placed on int* y. But if pointer y points to nothing, this is NULL.");
+        }
+      } else if (draggedButton.label === "y = x") {
+        if (isOnOrangeSquare(gridX, gridY)) {
+          if (mallocPosition !== null) {
+            yEqualsXAssigned = true;
+            draggedButton.btn.hide();
+            
+            // Create arrow animation from y to same place x points
+            createNewArrowAnimation(intYPosition, mallocPosition);
+            // Remove question mark for y
+            questionMarkY = null;
+            
+            // Update x=42 button to y=x=42 if it's already been assigned
+            let xMallocButton = draggableButtons.find(
+              (b) => b.label === "x = malloc(sizeof(int))"
+            );
+            if (xMallocButton && xMallocButton.btn.html() === "x = 42") {
+              xMallocButton.btn.html("y = x = 42");
+            }
+          } else {
+            resetButtonPosition(draggedButton);
+            showErrorMessage("This assignment requires x to point to a valid memory!");
+          }
+        } else {
+          resetButtonPosition(draggedButton);
+          showErrorMessage("Use this button to make int*y point to the same location as int*x.");
+        }
+      }
+    } else {
+      resetButtonPosition(draggedButton);
+      showErrorMessage("Memory space already occupied! Cannot place here.");
+    }
+
+    draggedButton.dragging = false;
+    dragging = null;
+  }
+}
+
+// Function to check if the new button placement would overlap with existing memory
+function checkMemoryOverlap(label, gridX, gridY) {
+  let requiredCells = [];
+  
+  // Determine which cells the new button needs
+  if (label === "int* x" || label === "int* y") {
+    for (let i = 0; i < 8; i++) {
+      requiredCells.push({ x: gridX + i, y: gridY });
+    }
+  } else if (label === "x = malloc(sizeof(int))") {
+    for (let i = 0; i < 4; i++) {
+      requiredCells.push({ x: gridX + i, y: gridY });
+    }
+  }
+  
+  // Check for overlap with intXPosition
+  if (intXPosition !== null) {
+    for (let i = 0; i < 8; i++) {
+      let xCell = { x: intXPosition.x + i, y: intXPosition.y };
+      for (let req of requiredCells) {
+        if (req.x === xCell.x && req.y === xCell.y) return true;
+      }
+    }
+  }
+  
+  // Check for overlap with intYPosition
+  if (intYPosition !== null) {
+    for (let i = 0; i < 8; i++) {
+      let yCell = { x: intYPosition.x + i, y: intYPosition.y };
+      for (let req of requiredCells) {
+        if (req.x === yCell.x && req.y === yCell.y) return true;
+      }
+    }
+  }
+  
+  // Check for overlap with mallocPosition
+  if (mallocPosition !== null) {
+    for (let i = 0; i < 4; i++) {
+      let mCell = { x: mallocPosition.x + i, y: mallocPosition.y };
+      for (let req of requiredCells) {
+        if (req.x === mCell.x && req.y === mCell.y) return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+function isOnPinkSquare(gridX, gridY) {
+  return (
+    intXPosition !== null &&
+    gridY === intXPosition.y &&
+    gridX >= intXPosition.x &&
+    gridX < intXPosition.x + 8
+  );
+}
+
+function isOnOrangeSquare(gridX, gridY) {
+  return (
+    intYPosition !== null &&
+    gridY === intYPosition.y &&
+    gridX >= intYPosition.x &&
+    gridX < intYPosition.x + 8
+  );
+}
+
+function updateButtonPosition(button, gridX, gridY) {
+  let newBtnX = instructionWidth + gridX * squareSize;
+  let newBtnY = gridY * squareSize;
+  button.btn.position(newBtnX, newBtnY);
+}
+
+function resetButtonPosition(button) {
+  button.btn.position(button.initialX, button.initialY);
+}
+
+function changeButtonLabelToXEquals42() {
+  let xMallocButton = draggableButtons.find(
+    (b) => b.label === "x = malloc(sizeof(int))"
+  );
+  if (xMallocButton) {
+    xMallocButton.btn.html("x = 42");
+  }
+}
+
+function changeButtonLabelToYEqualsXEquals42() {
+  let xMallocButton = draggableButtons.find(
+    (b) => b.label === "x = malloc(sizeof(int))"
+  );
+  if (xMallocButton) {
+    xMallocButton.btn.html("y = x = 42");
+  }
+}
+function changeButtonLabelToYEquals13() {
+  let xMallocButton = draggableButtons.find(
+    (b) => b.label === "x = malloc(sizeof(int))"
+  );
+  if (xMallocButton) {
+    if (xMallocButton.btn.html() === "y = x = 42") {
+      // If it was already showing both x and y pointing to 42,
+      // now both are pointing to 13
+      xMallocButton.btn.html("x = y = 13");
+    } else {
+      xMallocButton.btn.html("y = 13");
+    }
+  }
+}
+
+function showErrorMessage(message) {
+  errorMessage = message;
+  errorDisplayActive = true;
+  
+  // Hide all buttons while error is displayed
+  draggableButtons.forEach(button => {
+    button.btn.hide();
+  });
+  
+  setTimeout(() => {
+    errorDisplayActive = false;
+    // Show all buttons again when error disappears
+    draggableButtons.forEach(button => {
+      if ((button.label === "*x = 42" && circlePositionX) || 
+          (button.label === "*y = 13" && circlePositionY) || 
+          (button.label === "y = x" && yEqualsXAssigned)) {
+        // Keep these buttons hidden if they've been used
+      } else {
+        button.btn.show();
+      }
+    });
+  }, 2000);
+}
+
+function drawErrorOverlay() {
+  // Semi-transparent red overlay on the memory board
+  fill(255, 0, 0, 100);
+  noStroke();
+  rect(instructionWidth, 0, width - instructionWidth, height);
+  
+  // Draw a large X
+  stroke(255, 0, 0);
+  strokeWeight(10);
+  line(instructionWidth, 0, width, height);
+  line(width, 0, instructionWidth, height);
+  
+  // Error message box
+  fill(255);
+  noStroke();
+  rectMode(CENTER);
+  rect(instructionWidth + (width - instructionWidth) / 2, height / 2, (width - instructionWidth) * 0.8, 100);
+  
+  // Error message
+  fill(255, 0, 0);
+  textSize(20);
+  textAlign(CENTER, CENTER);
+  text(errorMessage, instructionWidth + (width - instructionWidth) / 2, height / 2);
+  rectMode(CORNER);
+}
+
+function createNewArrowAnimation(start, end) {
+  arrowAnimations.push({
+    start: start,
+    end: end,
+    progress: 0
+  });
+}
+
+function restartSimulation() {
+  intXPosition = null;
+  intYPosition = null;
+  mallocPosition = null;
+  yEqualsXAssigned = false;
+  circlePositionX = null;
+  circlePositionY = null;
+  circleActiveX = false;
+  circleActiveY = false;
+  circleProgressX = 0;
+  circleProgressY = 0;
+  circleReachedDestinationX = false;
+  circleReachedDestinationY = false;
+  arrowAnimations = [];
+  questionMarkX = null;
+  questionMarkY = null;
+  errorDisplayActive = false;
+
+  draggableButtons.forEach(({ btn, initialX, initialY, label }) => {
+    btn.position(initialX, initialY);
+    btn.html(label);
+    btn.show();
+  });
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  setup();
+  restartButton.position(10, height - 90);
+}
+
+function drawAnimatedArrow(start, end, progress) {
+  let startX = instructionWidth + start.x * squareSize + squareSize * 4;
+  let startY = start.y * squareSize + squareSize / 2;
+  let endX = instructionWidth + end.x * squareSize + squareSize * 2;
+  let endY = end.y * squareSize + squareSize / 2;
+
+  // Calculate current endpoint based on progress
+  let currentEndX = startX + (endX - startX) * progress;
+  let currentEndY = startY + (endY - startY) * progress;
+
+  stroke(0);
+  strokeWeight(2);
+  line(startX, startY, currentEndX, currentEndY);
+
+  // Only draw arrowhead if animation is at least 90% complete
+  if (progress > 0.9) {
+    fill(0);
+    push();
+    translate(currentEndX, currentEndY);
+    let angle = atan2(endY - startY, endX - startX);
+    rotate(angle);
+    triangle(0, 0, -10, -5, -10, 5);
+    pop();
+  }
+}
+
+function touchStarted() {
+  if (touches.length > 0) {
+    for (let i = 0; i < draggableButtons.length; i++) {
+      let btn = draggableButtons[i].btn;
+      if (
+        touches[0].x >= btn.x &&
+        touches[0].x <= btn.x + btn.width &&
+        touches[0].y >= btn.y &&
+        touches[0].y <= btn.y + btn.height
+      ) {
+        startDragging(i);
+        break;
+      }
+    }
+  }
+}
+
+function touchMoved() {
+  if (dragging !== null) {
+    let draggedButton = draggableButtons[dragging];
+    if (touches.length > 0) {
+      let inputX = touches[0].x;
+      let inputY = touches[0].y;
+      draggedButton.btn.position(
+        inputX - squareSize / 4,
+        inputY - squareSize / 4
+      );
+    }
+  }
+  return false; // Prevent default behavior
+}
