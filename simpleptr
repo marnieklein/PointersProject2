@@ -1,0 +1,663 @@
+let dragButton;
+let labelButton;
+let restartButton;
+let numberInput; // New input field
+let createNumberButton; // Renamed from createButton to avoid conflict
+let isDragging = false;
+let offsetX, offsetY;
+let targetSquare = null;
+let newTargetSquare = null;
+let squareSize;
+let cols, rows;
+let lastLabel = "";
+let draggingLabelButton = false;
+let occupiedSquares = []; // Array to track the 4 bytes occupied by the int value
+let pointerSquares = []; // Array to track the 8 bytes occupied by the pointer
+
+// Hover text variables
+let showHoverText = false;
+let hoverText = "";
+let hoverX = 0;
+let hoverY = 0;
+
+// Animation variables
+let animating = false;
+let animationProgress = 0;
+let animationSpeed = 0.05; // Speed of the animation (increase for faster animation)
+
+// Layout variables
+let controlPanelWidth; // Width of the control panel area
+let gridAreaX; // X position where the grid starts
+
+let binkyImage;
+let binkyX, binkyY;
+
+function preload() {
+  // Preload the image so it is available before setup
+  binkyImage = loadImage('static/binky.jpg');
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  frameRate(30); // Set to 30fps for smoother animation
+  textAlign(CENTER, BOTTOM);
+  textSize(12);
+
+  // Calculate layout dimensions
+  controlPanelWidth = width / 3; // Left panel takes 1/3 of the screen
+  gridAreaX = controlPanelWidth; // Grid starts where the control panel ends
+
+  // Set position for the Binky image - below the instruction text
+  let binkyWidth = min(binkyImage.width, controlPanelWidth * 0.8); // Constrain to 80% of panel width
+  let scaleFactor = binkyWidth / binkyImage.width;
+  let binkyHeight = binkyImage.height * scaleFactor;
+  
+  // Position Binky in the middle upper area of control panel
+  binkyX = controlPanelWidth / 2 - binkyWidth / 2;
+  binkyY = height / 3 + 40; // Position below the text that will be at height/3
+
+  // Create the input field for number entry
+  numberInput = createInput('');
+  numberInput.size(100, 20);
+  numberInput.position(controlPanelWidth / 2 - 50, height * 0.65);
+  numberInput.attribute('placeholder', 'Enter number (1-100)');
+  
+  // Create the button to generate the draggable number
+  createNumberButton = createButton('Create Number');
+  createNumberButton.position(controlPanelWidth / 2 - 50, height * 0.65 + 30);
+  createNumberButton.mousePressed(createDraggableNumber);
+
+  // We'll initially hide the drag button until a number is entered
+  dragButton = createButton('');
+  dragButton.size(40, 20);
+  dragButton.mousePressed(() => startDragging(dragButton));
+  dragButton.mouseReleased(() => stopDragging(dragButton));
+  dragButton.hide();
+
+  // Add mouseover and mouseout event listeners for dragButton
+  dragButton.mouseOver(function() {
+    showHoverText = true;
+    hoverText = "the int to store requires 4 contiguous bytes of memory";
+    hoverX = dragButton.x + dragButton.width / 2;
+    hoverY = dragButton.y - 10;
+    loop(); // Start the draw loop to show hover text
+  });
+
+  dragButton.mouseOut(function() {
+    showHoverText = false;
+    if (!animating && !isDragging) {
+      noLoop(); // Stop the loop if not animating or dragging
+    }
+  });
+
+  // Create a label button, initially hidden
+  labelButton = createButton('');
+  labelButton.hide();
+  labelButton.mousePressed(() => startDragging(labelButton));
+  labelButton.mouseReleased(() => stopDragging(labelButton));
+
+  // Add mouseover and mouseout event listeners for labelButton
+  labelButton.mouseOver(function() {
+    showHoverText = true;
+    hoverText = "the address of the int to store requires 8 contiguous bytes of memory";
+    hoverX = labelButton.x + labelButton.width / 2;
+    hoverY = labelButton.y - 10;
+    loop(); // Start the draw loop to show hover text
+  });
+
+  labelButton.mouseOut(function() {
+    showHoverText = false;
+    if (!animating && !isDragging) {
+      noLoop(); // Stop the loop if not animating or dragging
+    }
+  });
+
+  // Create restart button and position it in the control panel area
+  restartButton = createButton('Restart');
+  restartButton.position(10, height - 50);
+  restartButton.mousePressed(restartSimulation);
+  restartButton.show();
+
+  // Calculate grid dimensions - grid now only takes up 2/3 of the screen width
+  squareSize = 60; // Set your desired square size
+  cols = floor((width - controlPanelWidth) / squareSize);
+  rows = floor(height / squareSize);
+}
+
+function createDraggableNumber() {
+  // Get the value from the input field
+  let value = parseInt(numberInput.value());
+  
+  // Check if the value is within range
+  if (isNaN(value) || value < 1 || value > 100) {
+    alert("Please enter a number between 1 and 100");
+    return;
+  }
+  
+  // Create the drag button with the entered value
+  dragButton.html(value);
+  dragButton.position(controlPanelWidth / 2 - 20, height * 0.75);
+  dragButton.show();
+  
+  // Hide the input and create button after successful creation
+  numberInput.hide();
+  createNumberButton.hide();
+}
+
+function draw() {
+  // Clear the canvas completely
+  clear();
+  background(255);
+
+  // Draw the control panel background
+  fill(220);
+  stroke(0);
+  strokeWeight(1);
+  rect(0, 0, controlPanelWidth, height);
+
+  // Draw Binky image consistently below the instruction text
+  let binkyWidth = min(binkyImage.width, controlPanelWidth * 0.8);
+  let scaleFactor = binkyWidth / binkyImage.width;
+  let binkyHeight = binkyImage.height * scaleFactor;
+  
+  // Draw the image, scaling it to fit the control panel width
+  image(binkyImage, binkyX, binkyY, binkyWidth, binkyHeight);
+
+  // Set consistent stroke weight for grid
+  strokeWeight(1);
+
+  // Draw the grid - starting from the controlPanelWidth position
+  let counter = 0;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let xpos = gridAreaX + x * squareSize;
+      let ypos = y * squareSize;
+
+      // Check if this square is part of the occupied squares (int value)
+      let isOccupied = false;
+      for (let i = 0; i < occupiedSquares.length; i++) {
+        if (occupiedSquares[i].x === x && occupiedSquares[i].y === y) {
+          isOccupied = true;
+          break;
+        }
+      }
+
+      // Check if this square is part of the pointer squares
+      let isPointerSquare = false;
+      for (let i = 0; i < pointerSquares.length; i++) {
+        if (pointerSquares[i].x === x && pointerSquares[i].y === y) {
+          isPointerSquare = true;
+          break;
+        }
+      }
+
+      // Determine the fill color based on square state
+      if (isOccupied) {
+        fill(144, 238, 144); // Green for occupied squares
+      } else if (newTargetSquare && newTargetSquare.x === x && newTargetSquare.y === y) {
+        fill(173, 216, 230); // Blue for the target square
+      } else if (isPointerSquare) {
+        fill(173, 216, 230); // Blue for pointer squares
+      } else {
+        fill(240); // Default background
+      }
+
+      stroke(0);
+      rect(xpos, ypos, squareSize, squareSize);
+
+      // Label each square with ascending hexadecimal
+      fill(0);
+      noStroke();
+      let hexLabel = "0x" + counter.toString(16).toUpperCase();
+      text(hexLabel, xpos + squareSize / 2, ypos + squareSize);
+
+      if (newTargetSquare && newTargetSquare.x === x && newTargetSquare.y === y) {
+        textSize(14);
+        text("p", xpos + squareSize / 2, ypos + squareSize / 2 - 10);
+        // Display lastLabel under "p"
+        textSize(10);
+        text(lastLabel, xpos + squareSize / 2, ypos + squareSize / 2 + 10);
+        textSize(12);
+      }
+
+      counter++;
+    }
+  }
+
+  // Add title text in the control panel
+  fill(0);
+  noStroke();
+  textSize(16);
+
+  // Display different text based on the state
+  textAlign(CENTER);
+  fill(0);
+  textSize(16);
+  if (dragButton.elt.style.display === 'none' && !targetSquare) {
+    // Initial instruction when input field is shown
+    text("Let's envision how pointers \n work. Enter a number between \n 1-100 and create a button \n to drag onto the memory board.", controlPanelWidth / 2, height / 3);
+  } else if (!targetSquare) {
+    // After button is created but before placement
+    text("Let's envision how pointers \n work. Drag and drop this \n int value onto the \n memory board.", controlPanelWidth / 2, height / 3);
+  } else if (targetSquare && !newTargetSquare) {
+    // Message after int is placed but before address is placed
+    text("Successful placement of the int!\nNow, you can create a pointer by\nstoring the address of the first byte\nof the integer. Could you drag\nthis address onto the memory board?", controlPanelWidth / 2, height / 3);
+  } else if (newTargetSquare) {
+    // Message after both int and address are placed
+    text("Pointer successfully created!\nThe pointer 'p' stores the address\nof the integer 'n'. \n Wherever the 'n' moves, \n the 'p' pointer will store its address. \n \n Try it!", controlPanelWidth / 2, height / 3);
+  }
+
+  if (targetSquare) {
+    // Draw "n" above the number button when landed
+    fill(0);
+    textSize(12);
+    text("n", dragButton.x + 20, dragButton.y - 10);  // Above button center
+  }
+
+  // Draw an animated arrow from the blue square to the green square
+  if (newTargetSquare && occupiedSquares.length > 0) {
+    if (animating) {
+      // Use animationProgress to determine how much of the arrow to draw
+      drawAnimatedArrow(
+        createVector(gridAreaX + newTargetSquare.x * squareSize + squareSize / 2, newTargetSquare.y * squareSize + squareSize / 2),
+        createVector(gridAreaX + occupiedSquares[0].x * squareSize + squareSize / 2, occupiedSquares[0].y * squareSize + squareSize / 2),
+        animationProgress
+      );
+
+      // Increment animation progress
+      animationProgress += animationSpeed;
+
+      // Cap the progress at 1 and stop animating
+      if (animationProgress >= 1) {
+        animationProgress = 1;
+        animating = false;
+        if (!isDragging && !showHoverText) {
+          noLoop(); // Stop the loop when animation is complete and not hovering
+        }
+      }
+    } else {
+      // If not animating, draw the complete arrow if animationProgress is 1
+      if (animationProgress >= 1) {
+        drawAnimatedArrow(
+          createVector(gridAreaX + newTargetSquare.x * squareSize + squareSize / 2, newTargetSquare.y * squareSize + squareSize / 2),
+          createVector(gridAreaX + occupiedSquares[0].x * squareSize + squareSize / 2, occupiedSquares[0].y * squareSize + squareSize / 2),
+          1
+        );
+      }
+    }
+  }
+
+  // Draw the hover text at the VERY END to ensure it's on top
+  if (showHoverText) {
+    drawHoverText();
+  }
+
+  // If we're animating or showing hover text, keep drawing frames
+  if (animating || showHoverText || isDragging) {
+    // Already looping
+  } else if (!isDragging) {
+    noLoop(); // Stop looping when not animating, hovering, or dragging
+  }
+}
+
+function drawHoverText() {
+  // Save the current drawing state
+  push();
+
+  // Make sure we're drawing on top by using a separate layer approach
+  // First, draw a semi-transparent backdrop to ensure text is readable
+  fill(255, 255, 255, 220); // White with some transparency
+  stroke(100, 100, 100);
+  strokeWeight(1);
+  rectMode(CENTER);
+
+  // Calculate text dimensions for the box
+  let textWidth = max(hoverText.length * 7, 100); // Minimum width of 100px
+  let textHeight = 24;
+  let padding = 6;
+
+  // Draw the background with a shadow effect
+  // Shadow
+  fill(0, 0, 0, 30);
+  noStroke();
+  rect(hoverX + 2, hoverY + 2, textWidth + padding * 2, textHeight + padding, 5);
+
+  // Main box
+  fill(255, 255, 230); // Light yellow
+  stroke(150, 150, 100);
+  strokeWeight(1);
+  rect(hoverX, hoverY, textWidth + padding * 2, textHeight + padding, 5);
+
+  // Draw the hover text
+  fill(0);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(12);
+  text(hoverText, hoverX, hoverY);
+
+  // Restore the previous drawing state
+  pop();
+}
+
+function mouseSensed() {
+  // Check if mouse is over dragButton or labelButton
+  let overDragButton = dragButton.elt.style.display !== 'none' && dragButton.elt.matches(':hover');
+  let overLabelButton = labelButton.elt.style.display !== 'none' && labelButton.elt.matches(':hover');
+
+  return overDragButton || overLabelButton;
+}
+
+function startDragging(button) {
+  isDragging = true;
+  loop(); // Start the draw loop when dragging
+
+  if (button === labelButton) {
+    draggingLabelButton = true;
+  }
+
+  offsetX = mouseX - button.x;
+  offsetY = mouseY - button.y;
+
+  // Hide hover text while dragging
+  showHoverText = false;
+}
+
+function stopDragging(button) {
+  isDragging = false;
+
+  if (button === labelButton) {
+    draggingLabelButton = false;
+  }
+
+  let inputX = mouseX;
+  let inputY = mouseY;
+
+  // Convert grid coordinates to local grid coordinates (adjusting for the grid area position)
+  let gridX = floor((inputX - gridAreaX) / squareSize);
+  let gridY = floor(inputY / squareSize);
+
+  if (button === dragButton) {
+    // Check if the target position is valid for the dragButton
+    // Ensure the position is within bounds and doesn't overlap with pointerSquares
+    let canPlaceDragButton = true;
+    if (gridX < 0 || gridX > cols - 4 || gridY < 0 || gridY >= rows) {
+      canPlaceDragButton = false;
+    } else {
+      for (let i = 0; i < 4; i++) {
+        let checkSquare = createVector(gridX + i, gridY);
+        for (let j = 0; j < pointerSquares.length; j++) {
+          if (pointerSquares[j].equals(checkSquare)) {
+            canPlaceDragButton = false;
+            break;
+          }
+        }
+        if (!canPlaceDragButton) break;
+      }
+    }
+
+    if (canPlaceDragButton) {
+      // Update or set the targetSquare
+      targetSquare = createVector(gridX, gridY);
+      
+      // Center the button in the square on the grid
+      button.position(gridAreaX + gridX * squareSize + (squareSize - button.width) / 2, gridY * squareSize + (squareSize - button.height) / 2);
+
+      // Calculate the label of the target square
+      lastLabel = "0x" + (gridY * cols + gridX).toString(16).toUpperCase();
+
+      // Update and show the labelButton with the last label (in the control panel)
+      labelButton.html(lastLabel);
+      labelButton.position(controlPanelWidth / 2 + 30, height * 0.75);
+      labelButton.size(40, 20);
+      
+      // Only show label button if we don't have a pointer already placed
+      if (!newTargetSquare) {
+        labelButton.show();
+      }
+
+      // Clear previous occupied squares
+      occupiedSquares = [];
+
+      // Fill occupied squares with four contiguous horizontal squares
+      for (let i = 0; i < 4; i++) {
+        occupiedSquares.push(createVector(gridX + i, gridY));
+      }
+      
+      // If we already have a pointer placed, update the arrow
+      if (newTargetSquare) {
+        // Reset and start the arrow animation when the int button is moved
+        animationProgress = 0;
+        animating = true;
+        loop(); // Start the draw loop for animation
+        
+        // Update the label text in the pointer square to the new address
+        lastLabel = "0x" + (gridY * cols + gridX).toString(16).toUpperCase();
+      }
+
+    } else {
+      // If not valid, reset the button to its previous position
+      if (targetSquare) {
+        button.position(gridAreaX + targetSquare.x * squareSize + (squareSize - button.width) / 2, targetSquare.y * squareSize + (squareSize - button.height) / 2);
+      } else {
+        button.position(controlPanelWidth / 2 - 20, height * 0.75);
+      }
+    }
+  } else if (button === labelButton) {
+    // Check if the target position is valid for the labelButton
+    if (gridX >= 0 && gridX <= cols - 8 && gridY >= 0 && gridY < rows) {
+      // Ensure the 8 squares do not overlap with occupiedSquares
+      let canPlacePointer = true;
+      for (let i = 0; i < 8; i++) {
+        let checkSquare = createVector(gridX + i, gridY);
+        for (let j = 0; j < occupiedSquares.length; j++) {
+          if (occupiedSquares[j].equals(checkSquare)) {
+            canPlacePointer = false;
+            break;
+          }
+        }
+        if (!canPlacePointer) break;
+      }
+
+      if (canPlacePointer) {
+        newTargetSquare = createVector(gridX, gridY);
+        button.position(controlPanelWidth / 2 + 30, height * 0.75);
+        
+        // Hide the label button once it's placed on the grid
+        // (we don't want to drag it anymore)
+        labelButton.hide();
+
+        // Clear previous pointer squares
+        pointerSquares = [];
+
+        // Fill pointer squares with eight contiguous horizontal squares
+        for (let i = 0; i < 8; i++) {
+          pointerSquares.push(createVector(gridX + i, gridY));
+        }
+
+        // Reset and start the arrow animation when the label is placed
+        if (occupiedSquares.length > 0) {
+          animationProgress = 0;
+          animating = true;
+          loop(); // Start the draw loop for animation
+        }
+      } else {
+        // If overlap is detected, reset the labelButton to its original position
+        button.position(controlPanelWidth / 2 + 30, height * 0.75);
+      }
+    } else {
+      // If not enough space, reset the labelButton to its original position
+      button.position(controlPanelWidth / 2 + 30, height * 0.75);
+    }
+  }
+
+  // Keep looping if we're still animating or showing hover text
+  if (!animating && !isDragging && !showHoverText) {
+    noLoop();
+  }
+
+  // Single redraw instead of setting a loop
+  redraw();
+}
+
+function restartSimulation() {
+  // Reset everything to initial state
+  targetSquare = null;
+  newTargetSquare = null;
+  occupiedSquares = [];
+  pointerSquares = [];
+  animating = false;
+  animationProgress = 0;
+  showHoverText = false;
+  
+  // Show the input field and create button again
+  numberInput.show();
+  numberInput.value('');
+  createNumberButton.show();
+
+  // Hide the dragButton
+  dragButton.hide();
+  
+  // Hide the labelButton
+  labelButton.hide();
+
+  // Keep restart button positioned in the control panel
+  restartButton.position(10, height - 50);
+
+  // Force a redraw
+  redraw();
+}
+
+function mouseDragged() {
+  handleDrag();
+}
+
+function mouseMoved() {
+  handleMove();
+}
+
+function touchStarted() {
+  if (touches.length === 0) return;
+  if (dragButton.overlap(touches[0].x, touches[0].y)) startDragging(dragButton);
+  if (labelButton.overlap(touches[0].x, touches[0].y)) startDragging(labelButton);
+}
+
+function touchMoved() {
+  handleDrag();
+  return false; // Prevent default behavior
+}
+
+function touchEnded() {
+  stopDragging(dragButton);
+  stopDragging(labelButton);
+  return false; // Prevent default behavior
+}
+
+function handleDrag() {
+  if (isDragging) {
+    let inputX, inputY;
+    if (touches.length > 0) {
+      inputX = touches[0].x;
+      inputY = touches[0].y;
+    } else {
+      inputX = mouseX;
+      inputY = mouseY;
+    }
+
+    if (draggingLabelButton) {
+      labelButton.position(inputX - offsetX, inputY - offsetY);
+    } else {
+      dragButton.position(inputX - offsetX, inputY - offsetY);
+    }
+    
+    // Make sure we keep drawing while dragging
+    loop();
+  }
+}
+
+function handleMove() {
+  // Check if mouse is over buttons
+  if (mouseSensed()) {
+    loop();
+  } else if (!animating && !isDragging && showHoverText) {
+    showHoverText = false;
+    noLoop(); // Stop the loop if not animating or dragging
+  }
+}
+
+function drawAnimatedArrow(base, target, progress) {
+  // Calculate direction vector from base to target
+  let direction = p5.Vector.sub(target, base);
+  let distance = direction.mag();
+  direction.normalize();
+
+  // Calculate edge points
+  let startEdge = createVector(base.x + direction.x * (squareSize / 2), base.y + direction.y * (squareSize / 2));
+  let endEdge = createVector(target.x - direction.x * (squareSize / 2), target.y - direction.y * (squareSize / 2));
+
+  // Calculate the current endpoint based on progress
+  let currentEndX = startEdge.x + (endEdge.x - startEdge.x) * progress;
+  let currentEndY = startEdge.y + (endEdge.y - startEdge.y) * progress;
+
+  // Draw the line
+  stroke(0);
+  strokeWeight(2);
+  line(startEdge.x, startEdge.y, currentEndX, currentEndY);
+
+  // Only draw the arrowhead when we've reached at least 95% of the way
+  if (progress > 0.95) {
+    // Calculate and draw an arrowhead
+    let angle = atan2(direction.y, direction.x);
+    let arrowSize = 7;
+
+    push();
+    translate(endEdge.x, endEdge.y);
+    rotate(angle);
+    line(0, 0, -arrowSize, -arrowSize / 2);
+    line(0, 0, -arrowSize, arrowSize / 2);
+    pop();
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+
+  // Update layout values
+  controlPanelWidth = width / 3;
+  gridAreaX = controlPanelWidth;
+
+  // Update Binky's position on resize to be below text
+  let binkyWidth = min(binkyImage.width, controlPanelWidth * 0.8);
+  let scaleFactor = binkyWidth / binkyImage.width;
+  let binkyHeight = binkyImage.height * scaleFactor;
+  
+  binkyX = controlPanelWidth / 2 - binkyWidth / 2;
+  binkyY = height / 3 + 40; // Below text
+
+  // Recalculate grid dimensions
+  cols = floor((width - controlPanelWidth) / squareSize);
+  rows = floor(height / squareSize);
+  
+  // Reposition input field and create button
+  numberInput.position(controlPanelWidth / 2 - 50, height * 0.65);
+  createNumberButton.position(controlPanelWidth / 2 - 50, height * 0.65 + 30);
+
+  if (targetSquare && dragButton.elt.style.display !== 'none') {
+    dragButton.position(gridAreaX + targetSquare.x * squareSize + squareSize / 2 - 20, targetSquare.y * squareSize + squareSize / 2 - 10);
+  } else if (dragButton.elt.style.display !== 'none') {
+    dragButton.position(controlPanelWidth / 2 - 20, height * 0.75); // Lower center
+  }
+
+  // Reposition the label button if it was shown
+  if (labelButton.elt.style.display !== 'none') {
+    labelButton.position(controlPanelWidth / 2 + 30, height * 0.75); // Adjacent to dragButton
+  }
+
+  // Keep the restart button in the lower-left corner of control panel
+  restartButton.position(10, height - 50);
+
+  // Reset hover text when resizing
+  showHoverText = false;
+
+  // Single redraw
+  redraw();
+}
