@@ -2,135 +2,216 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Binky Live!</title>
-  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="static/styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Pointers Project</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .header {
+            margin-bottom: 3rem;
+            text-align: center;
+        }
+
+        .card {
+            border-radius: 6px;
+            transition: transform 0.3s ease;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-header {
+            background-color: #4a6fa5;
+            color: white;
+            border-radius: 6px 6px 0 0 !important;
+            font-weight: 600;
+            padding: .5rem .5rem;
+            border: none;
+        }
+
+        .container {
+            max-width: none;
+            /* Remove the limit or set to a custom max-width */
+            width: 100%;
+            /* Ensure it takes full available width */
+        }
+
+        .btn-expand {
+            width: 100%;
+            text-align: left;
+            color: white;
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 1.2rem;
+        }
+
+        .btn-expand:focus,
+        .btn-expand:active {
+            box-shadow: none;
+            outline: none;
+        }
+
+        .card-body {
+            padding: 0;
+        }
+
+        .iframe-container {
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            padding-top: 60%;
+            /* 16:9 Aspect Ratio */
+        }
+
+        .iframe-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        .project-title {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .project-subtitle {
+            color: #7f8c8d;
+            font-weight: 300;
+            margin-bottom: .5rem;
+        }
+
+        .container {
+            max-width: 900px;
+        }
+    </style>
 </head>
 
 <body>
-  <div class="container-fluid">
-    <div class="card mb-4 box-shadow">
-      <div class="card-header">
-        <header>
-          <h1 class="text-center my-4" id="title" style="font-size: 80px; background-color: #000;">
-            <span style="color: red;">B</span>
-            <span style="color: orange;">i</span>
-            <span style="color: yellow;">n</span>
-            <span style="color: green;">k</span>
-            <span style="color: blue;">y</span>
-            <span style="color: rgb(255, 0, 34);">...</span>
-            <span style="color: indigo;">L</span>
-            <span style="color: violet;">i</span>
-            <span style="color: rgb(251, 249, 249);">v</span>
-            <span style="color: gray;">e</span><span style="color: pink;">!</span>
-          </h1>
-        </header>
-      </div>
+    <div class="container">
+        <div class="header">
+            <h1 class="project-title">The Pointers Project</h1>
+            <p class="project-subtitle">An interactive exploration of pointers as they appear in CS50.</p>
+        </div>
+
+        <!-- Card 1 -->
+        <div class="card">
+            <div class="card-header">
+                <button class="btn-expand" type="button" data-bs-toggle="collapse" data-bs-target="#collapse1"
+                    aria-expanded="false" aria-controls="collapse1">
+                    A. *In progress* What are Pointers?
+                </button>
+            </div>
+            <div class="collapse" id="collapse1">
+                <div class="card-body">
+                    <a href="https://editor.p5js.org/marnieklein/full/TLS4AcBTT" target="_blank">Full Screen Version</a>
+                    <div class="iframe-container">
+                        <iframe src="https://editor.p5js.org/marnieklein/full/TLS4AcBTT"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="card">
+            <div class="card-header">
+                <button class="btn-expand" type="button" data-bs-toggle="collapse" data-bs-target="#collapse2"
+                    aria-expanded="false" aria-controls="collapse2">
+                    B. *In progress* What happens when you dereference pointers?
+                </button>
+            </div>
+            <div class="collapse" id="collapse2">
+                <div class="card-body">
+                    <a href="https://editor.p5js.org/marnieklein/full/_8e8TB79T" target="_blank">Full Screen Version</a>
+                    <div class="iframe-container">
+                        <iframe src="https://editor.p5js.org/marnieklein/full/_8e8TB79T"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="card">
+            <div class="card-header">
+                <button class="btn-expand" type="button" data-bs-toggle="collapse" data-bs-target="#collapse3"
+                    aria-expanded="false" aria-controls="collapse3">
+                    C. *In progress* Swapping integers by <b>value</b>
+                </button>
+            </div>
+            <div class="collapse" id="collapse3">
+                <div class="card-body">
+                    <a href="https://editor.p5js.org/marnieklein/full/DSSo_rDMC" target="_blank">Full Screen Version</a>
+                    <div class="iframe-container">
+                        <iframe src="https://editor.p5js.org/marnieklein/full/DSSo_rDMC"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="card">
+            <div class="card-header">
+                <button class="btn-expand" type="button" data-bs-toggle="collapse" data-bs-target="#collapse4"
+                    aria-expanded="false" aria-controls="collapse4">
+                    D. *In progress* Swapping integers by <b>reference</b>
+                </button>
+            </div>
+            <div class="collapse" id="collapse4">
+                <div class="card-body">
+
+                    <a href="https://editor.p5js.org/marnieklein/full/OQixnqM7x" target="_blank">Full Screen Version</a>
+                    <div class="iframe-container">
+                        <iframe src="https://editor.p5js.org/marnieklein/full/OQixnqM7x"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 5 -->
+        <!-- <div class="card">
+            <div class="card-header">
+                <button class="btn-expand" type="button" data-bs-toggle="collapse" data-bs-target="#collapse5"
+                    aria-expanded="false" aria-controls="collapse5">
+                    D. *In progress* What are linked lists?
+                </button>
+            </div>
+            <div class="collapse" id="collapse5">
+                <div class="card-body">
+                    <a href="https://editor.p5js.org/marnieklein/full/69klME3vx" target="_blank">Full Screen Version</a>
+                    <div class="iframe-container">
+
+                        <iframe src="https://editor.p5js.org/marnieklein/full/69klME3vx"></iframe>
+                    </div>
+                </div>
+            </div> -->
+        </div>
+
+        <footer class="mt-4 text-center text-muted">
+            <p>Marnie Klein ~ T217 ~ Harvard Graduate School of Education </p>
+        </footer>
     </div>
-  </div>
-  <div class="container-fluid">
-    <div class="card mb-4 box-shadow">
-      <div class="card-header">
-        <header>
-          <h1>
-            <center>For Midterm Presentation</center>
-            <br><center>Note: Animations May not fully work on mobile.</center><br>
-            <center><a href="https://editor.p5js.org/marnieklein/full/TLS4AcBTT">Animation 1: Basic Pointers</a>
-            </center><br>
-            <center><a href="https://editor.p5js.org/marnieklein/full/_8e8TB79T"> Animation 2: Malloc, Pointers, and
-                dereferencing </a></center><br>
-            <center><a href=https://forms.gle/zLhsJz1VNr6BCPVB6">Give Feedback!!</a></center>
-            <center>Model site below:</center>
-          </h1>
-        </header>
-      </div>
-    </div>
-  </div>
 
-  <div class="container-fluid">
-    <div class="row">
-
-      <div class="col-lg-6"> <!-- Left Column -->
-        <div class="card mb-4 box-shadow">
-          <div class="card-header">
-            <h2 class="text-center">Source Code</h2>
-          </div>
-          <div class="content-box mb-4">
-            <div class="code-line">// Stores and prints an integer via its address
-              <div class="tooltip">Comment describing functionality</div>
-            </div>
-            <div class="code-line">#include &lt;stdio.h&gt;
-              <div class="tooltip">Include Standard IO library</div>
-            </div>
-            <div class="code-line">int main(void)
-              <div class="tooltip">Define main function</div>
-            </div>
-            <div class="code-line">{
-              <div class="tooltip">Start of block</div>
-            </div>
-            <div class="code-line"> int n = 50;
-              <div class="tooltip">Declare and initialize an integer</div>
-            </div>
-            <div class="code-line"> int *p = &n;
-              <div class="tooltip">Declare pointer and assign address of n</div>
-            </div>
-            <div class="code-line"> printf("%i\\n", *p);
-              <div class="tooltip">Print the value pointed by p</div>
-            </div>
-            <div class="code-line">}
-              <div class="tooltip">End of block</div>
-            </div>
-          </div>
-        </div>
-        <!-- Display Output Container -->
-        <div class="card mb-4 box-shadow">
-          <div class="card-header">
-            <h2 class="text-center">Display Output</h2>
-          </div>
-          <div class="content-box">
-            <p class="text-center">50</p>
-          </div>
-        </div>
-        <!-- Acknowledgements Section -->
-        <div class="card mb-4 box-shadow">
-          <div class="card-header">
-            <h2 class="text-center">Acknowledgements</h2>
-          </div>
-          <div class="content-box">
-            <p class="text-center">Thank you to Nick Parlante of Stanford University for inspiring this site and this
-              project. Thank you to Dr. David Malan for the source code. Thank you to Brian Yu for help understanding
-              and
-              implementing this project. GPT 4o and Claude were used in constructing this site and interactive.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-lg-6"> <!-- Right Column -->
-        <div class="card mb-4 box-shadow">
-          <div class="card-header">
-            <h2 class="text-center">Interactive Schematic</h2>
-          </div>
-          <div class="content-box mb-4">
-            <iframe src="https://editor.p5js.org/marnieklein/full/TLS4AcBTT"></iframe>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="binky">
-    <div class="control-btn" onclick="toggleBinkySize()">Minimize/Maximize</div>
-    <img src="static/binky.jpg" alt="Binky" class="binky-image">
-    <div class="speech-bubble">Welcome to "Binky Live"! Look at the code to the left, and explore an animation of the
-      code to the right.</div>
-  </div>
-
-  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-  <script src="static/main.js"></script>
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
